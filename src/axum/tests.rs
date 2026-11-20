@@ -76,7 +76,10 @@ async fn body_json(response: Response) -> Value {
 }
 
 fn header_str<'r>(response: &'r Response, name: &str) -> Option<&'r str> {
-    response.headers().get(name).and_then(|value| value.to_str().ok())
+    response
+        .headers()
+        .get(name)
+        .and_then(|value| value.to_str().ok())
 }
 
 fn app() -> Router {
@@ -88,7 +91,11 @@ fn app() -> Router {
 
 #[tokio::test]
 async fn html_response_includes_escaped_page_and_version() {
-    let response = send(app(), get_request("/foo?bar=baz").body(Body::empty()).unwrap()).await;
+    let response = send(
+        app(),
+        get_request("/foo?bar=baz").body(Body::empty()).unwrap(),
+    )
+    .await;
 
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(header_str(&response, "vary"), Some(X_INERTIA));
@@ -113,7 +120,8 @@ async fn html_response_escapes_json_for_script_context() {
     let app = Router::new()
         .route("/unsafe", get(unsafe_page))
         .layer(InertiaLayer::new("1").template(template));
-    let body = body_text(send(app, get_request("/unsafe").body(Body::empty()).unwrap()).await).await;
+    let body =
+        body_text(send(app, get_request("/unsafe").body(Body::empty()).unwrap()).await).await;
 
     assert!(!body.contains("</script><script>"));
     assert!(body.contains("\\u003C/script\\u003E"));
@@ -123,10 +131,17 @@ async fn html_response_escapes_json_for_script_context() {
 
 #[tokio::test]
 async fn inertia_json_response_includes_headers_url_and_version() {
-    let response = send(app(), inertia_get("/foo?bar=baz").body(Body::empty()).unwrap()).await;
+    let response = send(
+        app(),
+        inertia_get("/foo?bar=baz").body(Body::empty()).unwrap(),
+    )
+    .await;
 
     assert_eq!(response.status(), StatusCode::OK);
-    assert_eq!(header_str(&response, CONTENT_TYPE.as_str()), Some("application/json"));
+    assert_eq!(
+        header_str(&response, CONTENT_TYPE.as_str()),
+        Some("application/json")
+    );
     assert_eq!(header_str(&response, X_INERTIA), Some("true"));
     assert_eq!(header_str(&response, "vary"), Some(X_INERTIA));
 
@@ -149,7 +164,13 @@ async fn nested_routes_use_original_uri_for_page_urls_and_conflicts() {
             .layer(InertiaLayer::new("1")),
     );
 
-    let response = send(app.clone(), inertia_get("/nested/foo?bar=baz").body(Body::empty()).unwrap()).await;
+    let response = send(
+        app.clone(),
+        inertia_get("/nested/foo?bar=baz")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
     assert_eq!(body_json(response).await["url"], "/nested/foo?bar=baz");
 
     let response = send(
@@ -162,14 +183,19 @@ async fn nested_routes_use_original_uri_for_page_urls_and_conflicts() {
     )
     .await;
     assert_eq!(response.status(), StatusCode::CONFLICT);
-    assert_eq!(header_str(&response, X_INERTIA_LOCATION), Some("/nested/foo?bar=baz"));
+    assert_eq!(
+        header_str(&response, X_INERTIA_LOCATION),
+        Some("/nested/foo?bar=baz")
+    );
 }
 
 #[tokio::test]
 async fn absolute_form_requests_use_local_page_urls() {
     let response = send(
         app(),
-        inertia_get("http://example.com/foo?bar=baz").body(Body::empty()).unwrap(),
+        inertia_get("http://example.com/foo?bar=baz")
+            .body(Body::empty())
+            .unwrap(),
     )
     .await;
 
@@ -192,7 +218,8 @@ async fn render_respects_explicit_url_and_builder_metadata() {
     let app = Router::new()
         .route("/builder", get(builder))
         .layer(InertiaLayer::new("1"));
-    let page = body_json(send(app, inertia_get("/builder").body(Body::empty()).unwrap()).await).await;
+    let page =
+        body_json(send(app, inertia_get("/builder").body(Body::empty()).unwrap()).await).await;
 
     assert_eq!(page["url"], "/custom-url");
     assert_eq!(page["mergeProps"], json!(["notifications"]));
@@ -200,8 +227,12 @@ async fn render_respects_explicit_url_and_builder_metadata() {
 
 #[tokio::test]
 async fn async_lazy_deferred_and_optional_props_through_axum() {
-    let full = body_json(send(app(), inertia_get("/lazy").body(Body::empty()).unwrap()).await).await;
-    assert_eq!(full["props"], json!({ "users": ["Ada", "Grace"], "errors": {} }));
+    let full =
+        body_json(send(app(), inertia_get("/lazy").body(Body::empty()).unwrap()).await).await;
+    assert_eq!(
+        full["props"],
+        json!({ "users": ["Ada", "Grace"], "errors": {} })
+    );
     assert_eq!(full["deferredProps"], json!({ "default": ["stats"] }));
 
     let deferred = body_json(
@@ -216,7 +247,10 @@ async fn async_lazy_deferred_and_optional_props_through_axum() {
         .await,
     )
     .await;
-    assert_eq!(deferred["props"], json!({ "stats": 7, "audit": ["created"], "errors": {} }));
+    assert_eq!(
+        deferred["props"],
+        json!({ "stats": 7, "audit": ["created"], "errors": {} })
+    );
 }
 
 #[tokio::test]
@@ -225,7 +259,11 @@ async fn respond_without_template_fails_for_html_but_not_json() {
         .route("/lazy", get(lazy_page))
         .layer(InertiaLayer::new("1"));
 
-    let html = send(app.clone(), get_request("/lazy").body(Body::empty()).unwrap()).await;
+    let html = send(
+        app.clone(),
+        get_request("/lazy").body(Body::empty()).unwrap(),
+    )
+    .await;
     assert_eq!(html.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
     let json = send(app, inertia_get("/lazy").body(Body::empty()).unwrap()).await;
@@ -235,7 +273,10 @@ async fn respond_without_template_fails_for_html_but_not_json() {
 fn shared_app(shared: SharedProps) -> Router {
     async fn route_auth(request: InertiaRequest) -> Result<Response, InertiaError> {
         request
-            .respond(Inertia::response("route-auth", json!({ "auth": { "user": { "name": "Route" } }, "n": 1 })))
+            .respond(Inertia::response(
+                "route-auth",
+                json!({ "auth": { "user": { "name": "Route" } }, "n": 1 }),
+            ))
             .await
     }
 
@@ -252,14 +293,26 @@ async fn shared_props_are_resolved_with_route_props() {
         .value("appName", "Demo")
         .value("n", 99)
         .prop("auth.user", |request| {
-            request.extension::<User>().map(|user| json!({ "name": user.name }))
+            request
+                .extension::<User>()
+                .map(|user| json!({ "name": user.name }))
         });
-    let page = body_json(send(shared_app(shared), inertia_get("/foo").body(Body::empty()).unwrap()).await).await;
+    let page = body_json(
+        send(
+            shared_app(shared),
+            inertia_get("/foo").body(Body::empty()).unwrap(),
+        )
+        .await,
+    )
+    .await;
 
     assert_eq!(page["props"]["appName"], "Demo");
     assert_eq!(page["props"]["n"], 42, "route props win");
     assert_eq!(page["props"]["auth"], json!({ "user": { "name": "Ada" } }));
-    assert_eq!(page["sharedProps"], json!(["errors", "appName", "n", "auth"]));
+    assert_eq!(
+        page["sharedProps"],
+        json!(["errors", "appName", "n", "auth"])
+    );
 }
 
 #[tokio::test]
@@ -276,13 +329,15 @@ async fn shared_props_registered_as_extensions_still_work() {
 #[tokio::test]
 async fn partial_reloads_filter_shared_props_and_skip_their_providers() {
     let calls = Arc::new(AtomicUsize::new(0));
-    let shared = SharedProps::new().value("appName", "Demo").prop("expensive", {
-        let calls = calls.clone();
-        move |_| {
-            calls.fetch_add(1, Ordering::SeqCst);
-            "value"
-        }
-    });
+    let shared = SharedProps::new()
+        .value("appName", "Demo")
+        .prop("expensive", {
+            let calls = calls.clone();
+            move |_| {
+                calls.fetch_add(1, Ordering::SeqCst);
+                "value"
+            }
+        });
     let page = body_json(
         send(
             shared_app(shared),
@@ -306,11 +361,18 @@ async fn shared_dotted_props_do_not_replace_route_owned_roots() {
         .value("auth.user", json!({ "name": "Shared" }))
         .value("auth.csrf", "token");
     let page = body_json(
-        send(shared_app(shared), inertia_get("/route-auth").body(Body::empty()).unwrap()).await,
+        send(
+            shared_app(shared),
+            inertia_get("/route-auth").body(Body::empty()).unwrap(),
+        )
+        .await,
     )
     .await;
 
-    assert_eq!(page["props"]["auth"], json!({ "user": { "name": "Route" } }));
+    assert_eq!(
+        page["props"]["auth"],
+        json!({ "user": { "name": "Route" } })
+    );
 }
 
 #[tokio::test]
@@ -350,7 +412,11 @@ async fn request_extensions_are_available() {
     let app = Router::new()
         .route("/extension-value", get(extension_value))
         .layer(Extension(User { name: "Ada" }));
-    let response = send(app, get_request("/extension-value").body(Body::empty()).unwrap()).await;
+    let response = send(
+        app,
+        get_request("/extension-value").body(Body::empty()).unwrap(),
+    )
+    .await;
 
     assert_eq!(body_text(response).await, "Ada");
 }
@@ -362,7 +428,10 @@ async fn unversioned_apps_send_an_empty_version_and_accept_a_missing_header() {
         .layer(InertiaLayer::unversioned());
     let response = send(
         app,
-        get_request("/foo").header(X_INERTIA, "true").body(Body::empty()).unwrap(),
+        get_request("/foo")
+            .header(X_INERTIA, "true")
+            .body(Body::empty())
+            .unwrap(),
     )
     .await;
 
@@ -424,10 +493,12 @@ async fn version_conflicts_short_circuit_and_report_the_server_version() {
 #[tokio::test]
 async fn dynamic_version_is_resolved_per_request() {
     let version = Arc::new(AtomicUsize::new(1));
-    let app = Router::new().route("/foo", get(page)).layer(InertiaLayer::dynamic({
-        let version = version.clone();
-        move || format!("dynamic-{}", version.load(Ordering::SeqCst))
-    }));
+    let app = Router::new()
+        .route("/foo", get(page))
+        .layer(InertiaLayer::dynamic({
+            let version = version.clone();
+            move || format!("dynamic-{}", version.load(Ordering::SeqCst))
+        }));
     let request = || {
         get_request("/foo")
             .header(X_INERTIA, "true")
@@ -459,7 +530,10 @@ async fn partial_reload_headers_apply_to_every_method() {
     )
     .await;
 
-    assert_eq!(body_json(response).await["props"], json!({ "n": 42, "errors": {} }));
+    assert_eq!(
+        body_json(response).await["props"],
+        json!({ "n": 42, "errors": {} })
+    );
 }
 
 fn redirect_app() -> Router {
@@ -505,7 +579,9 @@ fn method_request(method: &str, uri: &str, inertia: bool) -> Request<Body> {
         .method(Method::from_bytes(method.as_bytes()).unwrap())
         .uri(uri);
     if inertia {
-        builder = builder.header(X_INERTIA, "true").header(X_INERTIA_VERSION, "1");
+        builder = builder
+            .header(X_INERTIA, "true")
+            .header(X_INERTIA_VERSION, "1");
     }
     builder.body(Body::empty()).unwrap()
 }
@@ -565,7 +641,10 @@ async fn middleware_converts_handler_built_302_after_write_methods() {
 async fn fragment_redirects_become_inertia_redirects_except_for_prefetch() {
     let response = send(redirect_app(), method_request("POST", "/fragment", true)).await;
     assert_eq!(response.status(), StatusCode::CONFLICT);
-    assert_eq!(header_str(&response, X_INERTIA_REDIRECT), Some("/target#section"));
+    assert_eq!(
+        header_str(&response, X_INERTIA_REDIRECT),
+        Some("/target#section")
+    );
     assert!(response.headers().get(LOCATION).is_none());
 
     let mut prefetch = method_request("GET", "/fragment", true);
@@ -597,9 +676,10 @@ async fn empty_inertia_responses_redirect_back() {
 #[tokio::test]
 async fn back_uses_the_referer() {
     let mut request = method_request("POST", "/back", true);
-    request
-        .headers_mut()
-        .insert(REFERER, HeaderValue::from_static("http://localhost/users?page=2"));
+    request.headers_mut().insert(
+        REFERER,
+        HeaderValue::from_static("http://localhost/users?page=2"),
+    );
     let response = send(redirect_app(), request).await;
 
     assert_eq!(response.status(), StatusCode::SEE_OTHER);
@@ -637,7 +717,10 @@ impl SsrGateway for FakeSsr {
         let component = page["component"].as_str().unwrap_or_default().to_owned();
         Box::pin(async move {
             if fail {
-                Err(SsrError::new(crate::ssr::SsrErrorKind::Connection, "refused"))
+                Err(SsrError::new(
+                    crate::ssr::SsrErrorKind::Connection,
+                    "refused",
+                ))
             } else {
                 Ok(SsrResponse::new(
                     vec![format!("<title>{component}</title>")],
@@ -663,7 +746,14 @@ async fn ssr_renders_first_visits_only() {
     let calls = Arc::new(AtomicUsize::new(0));
     let app = ssr_app(false, SsrFailurePolicy::Fallback, calls.clone());
 
-    let body = body_text(send(app.clone(), get_request("/lazy").body(Body::empty()).unwrap()).await).await;
+    let body = body_text(
+        send(
+            app.clone(),
+            get_request("/lazy").body(Body::empty()).unwrap(),
+        )
+        .await,
+    )
+    .await;
     assert!(body.contains("<head><title>lazy</title></head>"));
     assert!(body.contains(r#"<div data-server-rendered="true" id="app">lazy</div>"#));
     assert!(!body.contains("data-page"));
@@ -725,7 +815,11 @@ async fn prop_timeouts_are_configurable_on_the_layer() {
             .prop_timeout(Duration::from_millis(20)),
     );
 
-    let response = send(app.clone(), inertia_get("/slow").body(Body::empty()).unwrap()).await;
+    let response = send(
+        app.clone(),
+        inertia_get("/slow").body(Body::empty()).unwrap(),
+    )
+    .await;
     assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
     let response = send(
@@ -760,7 +854,8 @@ async fn live_props_are_serialized_through_axum() {
     let app = Router::new()
         .route("/orders/1", get(order))
         .layer(InertiaLayer::new("1"));
-    let page = body_json(send(app, inertia_get("/orders/1").body(Body::empty()).unwrap()).await).await;
+    let page =
+        body_json(send(app, inertia_get("/orders/1").body(Body::empty()).unwrap()).await).await;
 
     assert_eq!(
         page["liveProps"]["order"]["listeners"][0]["channel"],
@@ -843,13 +938,31 @@ mod sessions {
         let cookie = cookie(&response).expect("session cookie");
 
         // An unrelated request does not consume the flash.
-        send(app.clone(), with_cookie(method_request("GET", "/favicon.ico", false), &cookie)).await;
+        send(
+            app.clone(),
+            with_cookie(method_request("GET", "/favicon.ico", false), &cookie),
+        )
+        .await;
 
-        let page = body_json(send(app.clone(), with_cookie(method_request("GET", "/users", true), &cookie)).await).await;
+        let page = body_json(
+            send(
+                app.clone(),
+                with_cookie(method_request("GET", "/users", true), &cookie),
+            )
+            .await,
+        )
+        .await;
         assert_eq!(page["flash"], json!({ "message": "User created" }));
         assert!(page["props"].get("flash").is_none());
 
-        let page = body_json(send(app, with_cookie(method_request("GET", "/users", true), &cookie)).await).await;
+        let page = body_json(
+            send(
+                app,
+                with_cookie(method_request("GET", "/users", true), &cookie),
+            )
+            .await,
+        )
+        .await;
         assert!(page.get("flash").is_none());
     }
 
@@ -867,7 +980,14 @@ mod sessions {
         assert_eq!(conflict.status(), StatusCode::CONFLICT);
 
         // The client follows with a full page load.
-        let html = body_text(send(app, with_cookie(method_request("GET", "/users", false), &cookie)).await).await;
+        let html = body_text(
+            send(
+                app,
+                with_cookie(method_request("GET", "/users", false), &cookie),
+            )
+            .await,
+        )
+        .await;
         assert!(html.contains(r#""flash":{"message":"User created"}"#));
     }
 
@@ -880,14 +1000,38 @@ mod sessions {
             .insert(REFERER, HeaderValue::from_static("/users/create"));
         let response = send(app.clone(), request).await;
         assert_eq!(response.status(), StatusCode::SEE_OTHER);
-        assert_eq!(header_str(&response, LOCATION.as_str()), Some("/users/create"));
+        assert_eq!(
+            header_str(&response, LOCATION.as_str()),
+            Some("/users/create")
+        );
         let cookie = cookie(&response).unwrap();
 
-        let page = body_json(send(app.clone(), with_cookie(method_request("GET", "/users/create", true), &cookie)).await).await;
-        assert_eq!(page["props"]["errors"], json!({ "name": "The name field is required." }));
+        let page = body_json(
+            send(
+                app.clone(),
+                with_cookie(method_request("GET", "/users/create", true), &cookie),
+            )
+            .await,
+        )
+        .await;
+        assert_eq!(
+            page["props"]["errors"],
+            json!({ "name": "The name field is required." })
+        );
 
-        let page = body_json(send(app.clone(), with_cookie(method_request("GET", "/users/create", true), &cookie)).await).await;
-        assert_eq!(page["props"]["errors"], json!({}), "errors are delivered once");
+        let page = body_json(
+            send(
+                app.clone(),
+                with_cookie(method_request("GET", "/users/create", true), &cookie),
+            )
+            .await,
+        )
+        .await;
+        assert_eq!(
+            page["props"]["errors"],
+            json!({}),
+            "errors are delivered once"
+        );
 
         let mut request = method_request("POST", "/users/create", true);
         request
@@ -898,7 +1042,8 @@ mod sessions {
         follow
             .headers_mut()
             .insert(X_INERTIA_ERROR_BAG, HeaderValue::from_static("createUser"));
-        let page = body_json(send(app, with_cookie(follow, &cookie_or(&response, &cookie))).await).await;
+        let page =
+            body_json(send(app, with_cookie(follow, &cookie_or(&response, &cookie))).await).await;
         assert_eq!(
             page["props"]["errors"],
             json!({ "createUser": { "name": "The name field is required." } })
@@ -915,15 +1060,30 @@ mod sessions {
         let response = send(app.clone(), method_request("POST", "/logout", true)).await;
         let cookie = cookie(&response).unwrap();
 
-        let page = body_json(send(app.clone(), with_cookie(method_request("GET", "/users", true), &cookie)).await).await;
+        let page = body_json(
+            send(
+                app.clone(),
+                with_cookie(method_request("GET", "/users", true), &cookie),
+            )
+            .await,
+        )
+        .await;
         assert_eq!(page["clearHistory"], true);
-        let page = body_json(send(app, with_cookie(method_request("GET", "/users", true), &cookie)).await).await;
+        let page = body_json(
+            send(
+                app,
+                with_cookie(method_request("GET", "/users", true), &cookie),
+            )
+            .await,
+        )
+        .await;
         assert!(page.get("clearHistory").is_none());
     }
 
     #[tokio::test]
     async fn rendered_pages_merge_request_and_response_flash() {
-        let page = body_json(send(session_app(), method_request("GET", "/inline", true)).await).await;
+        let page =
+            body_json(send(session_app(), method_request("GET", "/inline", true)).await).await;
         assert_eq!(page["flash"], json!({ "inline": true, "highlight": 3 }));
     }
 
@@ -934,7 +1094,10 @@ mod sessions {
         assert!(cookie(&response).is_some());
 
         let page = body_json(send(app, method_request("GET", "/users", true)).await).await;
-        assert!(page.get("flash").is_none(), "another session never sees the flash");
+        assert!(
+            page.get("flash").is_none(),
+            "another session never sees the flash"
+        );
     }
 }
 
@@ -1001,7 +1164,14 @@ mod layers {
 
         // The close page did not consume the flash...
         let page = body_json(
-            send(app, with_cookie(method_request("GET", "/users/create", true), &cookie.unwrap())).await,
+            send(
+                app,
+                with_cookie(
+                    method_request("GET", "/users/create", true),
+                    &cookie.unwrap(),
+                ),
+            )
+            .await,
         )
         .await;
         assert_eq!(page["flash"], json!({ "message": "Saved" }));
@@ -1018,9 +1188,23 @@ mod layers {
         assert_eq!(response.status(), StatusCode::FOUND);
         let cookie = cookie(&response).unwrap();
 
-        let page = body_json(send(app.clone(), with_cookie(method_request("GET", "/users/create", true), &cookie)).await).await;
+        let page = body_json(
+            send(
+                app.clone(),
+                with_cookie(method_request("GET", "/users/create", true), &cookie),
+            )
+            .await,
+        )
+        .await;
         assert_eq!(page["interstitial"], true);
-        let page = body_json(send(app, with_cookie(method_request("GET", "/users/create", true), &cookie)).await).await;
+        let page = body_json(
+            send(
+                app,
+                with_cookie(method_request("GET", "/users/create", true), &cookie),
+            )
+            .await,
+        )
+        .await;
         assert!(page.get("interstitial").is_none());
     }
 }

@@ -167,9 +167,7 @@ mod tests {
 
     #[test]
     fn root_id_is_attribute_escaped() {
-        let body = HtmlResponseContext::new("{}")
-            .with_root_id("a\"b")
-            .body();
+        let body = HtmlResponseContext::new("{}").with_root_id("a\"b").body();
 
         assert!(body.contains(r#"data-page="a&quot;b""#));
         assert!(body.contains(r#"id="a&quot;b""#));
@@ -183,7 +181,10 @@ mod tests {
         ));
 
         assert_eq!(context.head(), "<title>A</title>\n<meta name=x>");
-        assert_eq!(context.body(), "<div data-server-rendered=\"true\" id=\"app\">A</div>");
+        assert_eq!(
+            context.body(),
+            "<div data-server-rendered=\"true\" id=\"app\">A</div>"
+        );
         assert!(context.is_server_rendered());
     }
 }

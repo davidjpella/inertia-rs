@@ -32,9 +32,9 @@
 
 mod session;
 
-pub use session::{RequestSession, SessionBackend};
 #[cfg(feature = "tower-sessions")]
 pub use session::TowerSessions;
+pub use session::{RequestSession, SessionBackend};
 
 use crate::session::{ResponseKind, SessionState, SessionWrite, ValidationErrors};
 use crate::ssr::{Ssr, SsrError};
@@ -149,7 +149,7 @@ pub enum InertiaError {
     Props(crate::Error),
     /// Server-side rendering failed and the SSR policy is
     /// [`SsrFailurePolicy::Error`](crate::ssr::SsrFailurePolicy::Error).
-    Ssr(SsrError),
+    Ssr(Box<SsrError>),
     /// No root template was configured for a first-page HTML response.
     MissingTemplate,
 }
@@ -177,7 +177,7 @@ impl Error for InertiaError {
             Self::InvalidHeader(error) => Some(error),
             Self::InvalidUri(error) => Some(error),
             Self::Props(error) => Some(error),
-            Self::Ssr(error) => Some(error),
+            Self::Ssr(error) => Some(error.as_ref()),
             Self::MissingTemplate => None,
         }
     }
@@ -260,7 +260,11 @@ impl fmt::Debug for SharedProps {
         f.debug_struct("SharedProps")
             .field(
                 "keys",
-                &self.providers.iter().map(|(key, _)| key).collect::<Vec<_>>(),
+                &self
+                    .providers
+                    .iter()
+                    .map(|(key, _)| key)
+                    .collect::<Vec<_>>(),
             )
             .finish()
     }
@@ -484,7 +488,11 @@ impl InertiaRequest {
     /// Before a redirect the value is stored in the session (requires a
     /// session backend on [`InertiaLayer`]); on a rendered page it is sent in
     /// the same response.
-    pub fn flash<K: Into<String>, V: Serialize>(&self, key: K, value: V) -> Result<(), InertiaError> {
+    pub fn flash<K: Into<String>, V: Serialize>(
+        &self,
+        key: K,
+        value: V,
+    ) -> Result<(), InertiaError> {
         self.session
             .with(|state| state.flash(key, value))
             .map_err(InertiaError::Serialization)
@@ -528,9 +536,7 @@ impl InertiaRequest {
             .to_prop(self.context.error_bag(), self.config.all_error_messages);
         let mut entries = vec![("errors".to_owned(), Prop::json(errors).always())];
         entries.extend(shared.build(self));
-        let entries = entries
-            .into_iter()
-            .map(|(key, prop)| (key, prop.scoped()));
+        let entries = entries.into_iter().map(|(key, prop)| (key, prop.scoped()));
 
         let context = RenderContext::new(&self.context, self.uri.clone())
             .version(self.version.clone())
@@ -649,15 +655,18 @@ impl InertiaRequest {
             return Ok(self.json_response(&page));
         }
 
-        let mut context =
-            HtmlResponseContext::from_page(&page)?.with_root_id(&self.config.root_id);
+        let mut context = HtmlResponseContext::from_page(&page)?.with_root_id(&self.config.root_id);
 
         if let Some(ssr) = &self.config.ssr {
             let path = self.uri.split('?').next().unwrap_or("/");
 
             if ssr.applies_to(path) {
                 let page = serde_json::to_value(&page)?;
-                if let Some(rendered) = ssr.render(&page).await.map_err(InertiaError::Ssr)? {
+                if let Some(rendered) = ssr
+                    .render(&page)
+                    .await
+                    .map_err(|error| InertiaError::Ssr(Box::new(error)))?
+                {
                     context = context.with_ssr(rendered);
                 }
             }
@@ -936,7 +945,11 @@ fn is_redirect(status: StatusCode) -> bool {
     status.is_redirection()
 }
 
-fn finish_response(mut response: Response, facts: &RequestFacts, config: &InertiaConfig) -> Response {
+fn finish_response(
+    mut response: Response,
+    facts: &RequestFacts,
+    config: &InertiaConfig,
+) -> Response {
     add_vary_header(response.headers_mut());
 
     if !facts.is_inertia {

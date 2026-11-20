@@ -14,7 +14,10 @@ fn empty_map<K, V>(map: &BTreeMap<K, V>) -> bool {
     map.is_empty()
 }
 
-fn serialize_version<S: Serializer>(version: &Option<String>, serializer: S) -> Result<S::Ok, S::Error> {
+fn serialize_version<S: Serializer>(
+    version: &Option<String>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
     serializer.serialize_str(version.as_deref().unwrap_or(""))
 }
 
@@ -209,7 +212,8 @@ impl Layer {
         self.base.as_deref()
     }
 
-    pub(crate) fn set_base(&mut self, base: String) {
+    /// Replaces the base URL, for example with a host-relative form.
+    pub fn set_base(&mut self, base: String) {
         self.base = Some(base);
     }
 }
@@ -651,7 +655,13 @@ impl Page<Value> {
     /// Builds the experimental layer close page object:
     /// `{component: "", props: {}, url, version, close: true}`.
     pub fn close<U: Into<String>>(url: U, version: Option<String>) -> Self {
-        let mut page = Self::from_parts("", Value::Object(Map::new()), url, version, PageMetadata::new());
+        let mut page = Self::from_parts(
+            "",
+            Value::Object(Map::new()),
+            url,
+            version,
+            PageMetadata::new(),
+        );
         page.close = true;
         page
     }

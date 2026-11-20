@@ -176,6 +176,8 @@ pub(crate) struct ResolveInput<'a, 'r> {
     pub(crate) preserve_big_integers: bool,
 }
 
+// Most nodes are leaves, so boxing them would add an allocation per prop.
+#[allow(clippy::large_enum_variant)]
 enum Node<'a> {
     Leaf(Prop<'a>),
     Branch(Vec<(String, Node<'a>)>),
@@ -381,10 +383,9 @@ impl<'r> Filter<'r> {
     }
 
     fn matches_only(&self, path: &str) -> bool {
-        self.only.as_ref().is_some_and(|only| {
-            only.iter()
-                .any(|entry| is_same_or_descendant(path, entry))
-        })
+        self.only
+            .as_ref()
+            .is_some_and(|only| only.iter().any(|entry| is_same_or_descendant(path, entry)))
     }
 
     fn leads_to_only(&self, path: &str) -> bool {
@@ -438,11 +439,23 @@ impl<'r> Filter<'r> {
 /// Metadata operations, ordered by the tree position of the prop that
 /// produced them.
 enum MetaOp {
-    Deferred { group: String, path: String },
+    Deferred {
+        group: String,
+        path: String,
+    },
     Merge(crate::props::MergeMetadata),
-    Scroll { path: String, scroll: ScrollProps },
-    Once { key: String, once: OnceProp },
-    Live { path: String, live: LivePropMetadata },
+    Scroll {
+        path: String,
+        scroll: ScrollProps,
+    },
+    Once {
+        key: String,
+        once: OnceProp,
+    },
+    Live {
+        path: String,
+        live: LivePropMetadata,
+    },
     Rescued(String),
 }
 
@@ -516,14 +529,26 @@ impl Annotation {
 fn annotations_from(metadata: &PageMetadata) -> Vec<Annotation> {
     let mut annotations = Vec::new();
 
-    annotations.extend(metadata.always_props().iter().cloned().map(Annotation::Always));
+    annotations.extend(
+        metadata
+            .always_props()
+            .iter()
+            .cloned()
+            .map(Annotation::Always),
+    );
     for (group, props) in metadata.deferred_props() {
         annotations.extend(props.iter().map(|path| Annotation::Defer {
             path: path.clone(),
             group: group.clone(),
         }));
     }
-    annotations.extend(metadata.rescued_props().iter().cloned().map(Annotation::Rescue));
+    annotations.extend(
+        metadata
+            .rescued_props()
+            .iter()
+            .cloned()
+            .map(Annotation::Rescue),
+    );
     for (key, once) in metadata.once_props() {
         annotations.push(Annotation::Once {
             key: key.clone(),
@@ -560,8 +585,20 @@ fn annotations_from(metadata: &PageMetadata) -> Vec<Annotation> {
             .cloned()
             .map(Annotation::Prepend),
     );
-    annotations.extend(metadata.deep_merge_props().iter().cloned().map(Annotation::DeepMerge));
-    annotations.extend(metadata.match_props_on().iter().cloned().map(Annotation::MatchOn));
+    annotations.extend(
+        metadata
+            .deep_merge_props()
+            .iter()
+            .cloned()
+            .map(Annotation::DeepMerge),
+    );
+    annotations.extend(
+        metadata
+            .match_props_on()
+            .iter()
+            .cloned()
+            .map(Annotation::MatchOn),
+    );
 
     annotations
 }
@@ -589,7 +626,10 @@ fn apply_exact<'a>(prop: Prop<'a>, annotation: &Annotation) -> Prop<'a> {
         Annotation::Prepend(_) => prop.prepend(),
         Annotation::DeepMerge(_) => prop.deep_merge(),
         Annotation::MatchOn(path) => {
-            let field = path.rsplit_once('.').map(|(_, field)| field).unwrap_or(path);
+            let field = path
+                .rsplit_once('.')
+                .map(|(_, field)| field)
+                .unwrap_or(path);
             prop.match_on(field.to_owned())
         }
         Annotation::Scroll { scroll, .. } => prop.scroll(scroll.clone()),
@@ -685,7 +725,8 @@ impl<'r, 'a> Planner<'r, 'a> {
             return;
         }
 
-        self.ops.push((seq, MetaOp::Merge(prop.merge_metadata(path))));
+        self.ops
+            .push((seq, MetaOp::Merge(prop.merge_metadata(path))));
     }
 
     fn collect_once(&mut self, seq: usize, prop: &Prop<'_>, path: &str) {
@@ -793,8 +834,8 @@ impl<'r, 'a> Planner<'r, 'a> {
                 self.collect_live(seq, &prop, path, bypass);
             }
 
-            let ignored_first_load = prop.load == Load::Optional
-                || (prop.is_deferred() && prop.scroll.is_none());
+            let ignored_first_load =
+                prop.load == Load::Optional || (prop.is_deferred() && prop.scroll.is_none());
 
             if ignored_first_load {
                 self.collect_deferred(seq, &prop, path);
@@ -840,10 +881,22 @@ impl<'r, 'a> Planner<'r, 'a> {
             },
             Source::Nested(_) => unreachable!("nested props are expanded into branches"),
             Source::Sync(provider) => {
-                return Ok(Some(self.task(prop, path, seq, bypass, TaskProvider::Sync(provider))))
+                return Ok(Some(self.task(
+                    prop,
+                    path,
+                    seq,
+                    bypass,
+                    TaskProvider::Sync(provider),
+                )))
             }
             Source::Async(provider) => {
-                return Ok(Some(self.task(prop, path, seq, bypass, TaskProvider::Async(provider))))
+                return Ok(Some(self.task(
+                    prop,
+                    path,
+                    seq,
+                    bypass,
+                    TaskProvider::Async(provider),
+                )))
             }
         };
 
@@ -915,8 +968,9 @@ impl<'r, 'a> Planner<'r, 'a> {
     }
 }
 
-
 type TaskResult = Result<Option<Value>, BoxError>;
+type SyncTask<'a> = (usize, String, SyncProvider<'a>);
+type AsyncTask<'a> = (usize, String, AsyncProvider<'a>);
 
 struct Plan<'r, 'a> {
     planner: Planner<'r, 'a>,
@@ -924,7 +978,10 @@ struct Plan<'r, 'a> {
     shared_keys: Vec<String>,
 }
 
-fn plan<'r, 'a>(input: ResolveInput<'a, 'r>, options: &ResolveOptions) -> Result<Plan<'r, 'a>, Error> {
+fn plan<'r, 'a>(
+    input: ResolveInput<'a, 'r>,
+    options: &ResolveOptions,
+) -> Result<Plan<'r, 'a>, Error> {
     let mut shared_keys = Vec::new();
 
     if input.expose_shared_keys {
@@ -1034,9 +1091,7 @@ async fn run_async<'a>(
     }
 }
 
-fn take_providers<'a>(
-    tasks: &mut [Task<'a>],
-) -> (Vec<(usize, String, SyncProvider<'a>)>, Vec<(usize, String, AsyncProvider<'a>)>) {
+fn take_providers<'a>(tasks: &mut [Task<'a>]) -> (Vec<SyncTask<'a>>, Vec<AsyncTask<'a>>) {
     let mut sync = Vec::new();
     let mut asynchronous = Vec::new();
 
@@ -1053,10 +1108,7 @@ fn take_providers<'a>(
     (sync, asynchronous)
 }
 
-fn assemble(
-    slots: Vec<(String, Slot)>,
-    values: &mut [Option<Value>],
-) -> Map<String, Value> {
+fn assemble(slots: Vec<(String, Slot)>, values: &mut [Option<Value>]) -> Map<String, Value> {
     let mut map = Map::new();
 
     for (key, slot) in slots {
@@ -1197,7 +1249,9 @@ pub(crate) fn resolve_sync(
         return Err(Error::AsyncProp { path: path.clone() });
     }
 
-    let mut results = (0..plan.planner.tasks.len()).map(|_| None).collect::<Vec<_>>();
+    let mut results = (0..plan.planner.tasks.len())
+        .map(|_| None)
+        .collect::<Vec<_>>();
     for (index, path, provider) in sync {
         results[index] = Some(run_sync(provider, &path));
     }
@@ -1213,7 +1267,9 @@ pub(crate) async fn resolve_async(
     let preserve_big_integers = input.preserve_big_integers;
     let mut plan = plan(input, options)?;
     let (sync, asynchronous) = take_providers(&mut plan.planner.tasks);
-    let mut results = (0..plan.planner.tasks.len()).map(|_| None).collect::<Vec<_>>();
+    let mut results = (0..plan.planner.tasks.len())
+        .map(|_| None)
+        .collect::<Vec<_>>();
 
     for (index, path, provider) in sync {
         results[index] = Some(run_sync(provider, &path));

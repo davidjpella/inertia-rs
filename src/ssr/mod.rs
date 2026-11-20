@@ -13,6 +13,10 @@
 //! Configure [`SsrFailurePolicy::Error`] to fail loudly instead, for example in
 //! end-to-end tests.
 
+// SSR failures are rare and carry diagnostic detail; their size does not
+// matter on the hot path.
+#![allow(clippy::result_large_err)]
+
 use futures_util::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -22,7 +26,7 @@ use std::sync::Arc;
 #[cfg(feature = "ssr")]
 mod http;
 #[cfg(feature = "ssr")]
-pub use http::HttpSsrGateway;
+pub use http::{HttpSsrGateway, DEFAULT_SSR_URL};
 
 /// A successful SSR result.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -144,7 +148,7 @@ impl std::error::Error for SsrError {}
 
 /// Renders page objects on a server-side rendering backend.
 ///
-/// [`HttpSsrGateway`] (feature `ssr`) talks to the official Node SSR server
+/// `HttpSsrGateway` (feature `ssr`) talks to the official Node SSR server
 /// or the Vite dev server. Implement this trait to use another transport.
 pub trait SsrGateway: Send + Sync {
     /// Renders `page`, the full page object.

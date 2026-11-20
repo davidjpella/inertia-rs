@@ -35,10 +35,22 @@ mod tests {
 
     #[test]
     fn strips_same_host_origins_only() {
-        assert_eq!(to_relative_url("https://app.test/users?x=1", "app.test").as_deref(), Some("/users?x=1"));
-        assert_eq!(to_relative_url("http://app.test", "app.test").as_deref(), Some("/"));
-        assert_eq!(to_relative_url("http://app.test?x", "app.test").as_deref(), Some("/?x"));
-        assert_eq!(to_relative_url("https://other.test/users", "app.test"), None);
+        assert_eq!(
+            to_relative_url("https://app.test/users?x=1", "app.test").as_deref(),
+            Some("/users?x=1")
+        );
+        assert_eq!(
+            to_relative_url("http://app.test", "app.test").as_deref(),
+            Some("/")
+        );
+        assert_eq!(
+            to_relative_url("http://app.test?x", "app.test").as_deref(),
+            Some("/?x")
+        );
+        assert_eq!(
+            to_relative_url("https://other.test/users", "app.test"),
+            None
+        );
         assert_eq!(to_relative_url("/users", "app.test"), None);
     }
 }

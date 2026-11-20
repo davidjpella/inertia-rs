@@ -462,9 +462,15 @@ mod tests {
     #[test]
     fn channel_prefixes_are_stripped_for_matching_types_only() {
         assert_eq!(LiveChannel::presence("presence-room.1").name(), "room.1");
-        assert_eq!(LiveChannel::encrypted_private("private-encrypted-x").name(), "x");
+        assert_eq!(
+            LiveChannel::encrypted_private("private-encrypted-x").name(),
+            "x"
+        );
         assert_eq!(LiveChannel::public("private-x").name(), "private-x");
-        assert_eq!(LiveChannel::private("orders.1").broker_name(), "private-orders.1");
+        assert_eq!(
+            LiveChannel::private("orders.1").broker_name(),
+            "private-orders.1"
+        );
     }
 
     #[test]

@@ -35,11 +35,9 @@
 //! deferred props, optional props, and once props the client already has
 //! never call their providers.
 
-/// Rocket integration for Inertia responses and asset version checks.
 #[cfg(feature = "rocket")]
 pub mod rocket;
 
-/// Axum integration for Inertia responses and asset version checks.
 #[cfg(feature = "axum")]
 pub mod axum;
 
@@ -223,11 +221,9 @@ pub trait IntoPageProps<'a> {
 impl<'a, T: Serialize> IntoPageProps<'a> for T {
     fn into_page_props(self) -> Result<Props<'a>, Error> {
         match serde_json::to_value(self)? {
-            Value::Object(map) => Ok(map
-                .into_iter()
-                .fold(Props::new(), |props, (key, value)| {
-                    props.prop(key, Prop::json(value))
-                })),
+            Value::Object(map) => Ok(map.into_iter().fold(Props::new(), |props, (key, value)| {
+                props.prop(key, Prop::json(value))
+            })),
             Value::Null => Ok(Props::new()),
             _ => Err(Error::InvalidProps),
         }
@@ -686,7 +682,11 @@ struct Prepared<'r, 'a> {
 }
 
 impl Prepared<'_, '_> {
-    fn finish(parts: PageParts, metadata: &PageMetadata, resolved: resolve::Resolved) -> Page<Value> {
+    fn finish(
+        parts: PageParts,
+        metadata: &PageMetadata,
+        resolved: resolve::Resolved,
+    ) -> Page<Value> {
         let resolve::Resolved {
             props,
             metadata: resolved_metadata,

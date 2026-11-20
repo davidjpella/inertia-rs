@@ -30,7 +30,12 @@ fn partial(component: &'static str, only: &'static str) -> Vec<(&'static str, &'
 
 fn render<'a, T: IntoPageProps<'a>>(response: Inertia<T>, headers: &[(&str, &str)]) -> Value {
     let request = request(headers);
-    serde_json::to_value(response.into_page("/page", Some("v1".into()), &request).unwrap()).unwrap()
+    serde_json::to_value(
+        response
+            .into_page("/page", Some("v1".into()), &request)
+            .unwrap(),
+    )
+    .unwrap()
 }
 
 async fn render_async<'a, T: IntoPageProps<'a>>(
@@ -139,7 +144,10 @@ fn page_from_parts_serializes_every_metadata_field() {
         .defer_group("sidebar", "related")
         .rescue("permissions")
         .share("auth")
-        .once_with_key("plans", OnceProp::new("plans").expires_at(1_700_000_000_000));
+        .once_with_key(
+            "plans",
+            OnceProp::new("plans").expires_at(1_700_000_000_000),
+        );
     let page = Page::from_parts("Feed", json!({}), "/feed", Some("v".into()), metadata);
 
     assert_eq!(
@@ -169,11 +177,20 @@ fn page_from_parts_serializes_every_metadata_field() {
 fn partial_data_filters_matching_component_only() {
     let props = || json!({ "users": [1], "stats": 2, "audit": 3 });
 
-    let page = render(Inertia::response("Users", props()), &partial("Users", "users"));
+    let page = render(
+        Inertia::response("Users", props()),
+        &partial("Users", "users"),
+    );
     assert_eq!(page["props"], json!({ "users": [1], "errors": {} }));
 
-    let other = render(Inertia::response("Login", props()), &partial("Users", "users"));
-    assert_eq!(other["props"], json!({ "users": [1], "stats": 2, "audit": 3, "errors": {} }));
+    let other = render(
+        Inertia::response("Login", props()),
+        &partial("Users", "users"),
+    );
+    assert_eq!(
+        other["props"],
+        json!({ "users": [1], "stats": 2, "audit": 3, "errors": {} })
+    );
 }
 
 #[test]
@@ -184,7 +201,10 @@ fn partial_data_and_except_compose_by_narrowing_then_removing() {
     let mut headers = partial("Users", "users,stats");
     headers.push((X_INERTIA_PARTIAL_EXCEPT, "stats,audit"));
     let page = render(
-        Inertia::response("Users", json!({ "users": 1, "stats": 2, "audit": 3, "other": 4 })),
+        Inertia::response(
+            "Users",
+            json!({ "users": 1, "stats": 2, "audit": 3, "other": 4 }),
+        ),
         &headers,
     );
 
@@ -250,18 +270,22 @@ fn dotted_keys_build_nested_props_with_typed_children() {
     let response = || {
         Inertia::response(
             "P",
-            Props::new()
-                .value("auth.user", "Ada")
-                .prop(
-                    "auth.permissions",
-                    Prop::lazy(counted(&calls, json!(["edit"]))).defer(),
-                ),
+            Props::new().value("auth.user", "Ada").prop(
+                "auth.permissions",
+                Prop::lazy(counted(&calls, json!(["edit"]))).defer(),
+            ),
         )
     };
 
     let full = render(response(), &inertia());
-    assert_eq!(full["props"], json!({ "auth": { "user": "Ada" }, "errors": {} }));
-    assert_eq!(full["deferredProps"], json!({ "default": ["auth.permissions"] }));
+    assert_eq!(
+        full["props"],
+        json!({ "auth": { "user": "Ada" }, "errors": {} })
+    );
+    assert_eq!(
+        full["deferredProps"],
+        json!({ "default": ["auth.permissions"] })
+    );
     assert_eq!(calls.load(Ordering::SeqCst), 0);
 
     let deferred = render(response(), &partial("P", "auth.permissions"));
@@ -325,7 +349,10 @@ fn optional_props_follow_reference_partial_rules() {
     let mut headers = partial("Dashboard", "");
     headers.push((X_INERTIA_PARTIAL_EXCEPT, "users"));
     let except = render(response(), &headers);
-    assert_eq!(except["props"], json!({ "audit": ["created"], "errors": {} }));
+    assert_eq!(
+        except["props"],
+        json!({ "audit": ["created"], "errors": {} })
+    );
     assert_eq!(calls.load(Ordering::SeqCst), 2);
 }
 
@@ -361,7 +388,10 @@ fn deferred_merge_props_emit_merge_metadata_on_the_full_visit() {
     let page = render(
         Inertia::response(
             "Feed",
-            Props::new().prop("posts", Prop::lazy(|| json!([1])).defer().merge().match_on("id")),
+            Props::new().prop(
+                "posts",
+                Prop::lazy(|| json!([1])).defer().merge().match_on("id"),
+            ),
         ),
         &inertia(),
     );
@@ -439,7 +469,10 @@ fn fresh_and_custom_key_once_props() {
         Inertia::response(
             "Billing",
             Props::new()
-                .prop("plans", Prop::lazy(|| 1).once_as("billing-plans").expires_at(42))
+                .prop(
+                    "plans",
+                    Prop::lazy(|| 1).once_as("billing-plans").expires_at(42),
+                )
                 .prop("countries", Prop::lazy(|| 2).once().fresh()),
         ),
         &loaded,
@@ -475,7 +508,12 @@ fn merge_paths_and_matching_keys_are_relative_to_the_prop() {
         Inertia::response(
             "Feed",
             Props::new()
-                .prop("posts", Prop::value(json!({ "data": [] })).append_at("data").match_on("data.id"))
+                .prop(
+                    "posts",
+                    Prop::value(json!({ "data": [] }))
+                        .append_at("data")
+                        .match_on("data.id"),
+                )
                 .prop("notifications", Prop::value(json!([])).prepend())
                 .prop("conversations", Prop::value(json!({})).deep_merge()),
         ),
@@ -493,7 +531,10 @@ fn reset_props_drop_merge_metadata() {
     let mut headers = partial("Feed", "posts");
     headers.push((X_INERTIA_RESET, "posts"));
     let page = render(
-        Inertia::response("Feed", Props::new().prop("posts", Prop::value(json!([1])).merge())),
+        Inertia::response(
+            "Feed",
+            Props::new().prop("posts", Prop::value(json!([1])).merge()),
+        ),
         &headers,
     );
 
@@ -631,9 +672,22 @@ fn live_props_emit_listeners_and_survive_exclusion() {
         Inertia::response(
             "Orders/Show",
             Props::new()
-                .prop("order", Prop::lazy(|| json!({ "status": "shipped" })).live(live()))
-                .prop("metrics", Prop::lazy(|| 1).defer().live(LiveUpdates::on("M").channel("metrics")))
-                .prop("audit", Prop::lazy(|| 2).optional().live(LiveUpdates::on("A").channel("audit")))
+                .prop(
+                    "order",
+                    Prop::lazy(|| json!({ "status": "shipped" })).live(live()),
+                )
+                .prop(
+                    "metrics",
+                    Prop::lazy(|| 1)
+                        .defer()
+                        .live(LiveUpdates::on("M").channel("metrics")),
+                )
+                .prop(
+                    "audit",
+                    Prop::lazy(|| 2)
+                        .optional()
+                        .live(LiveUpdates::on("A").channel("audit")),
+                )
                 .value("other", 3),
         )
     };
@@ -655,7 +709,11 @@ fn live_props_emit_listeners_and_survive_exclusion() {
     let refresh = render(response(), &partial("Orders/Show", "order"));
     assert_eq!(refresh["props"]["order"]["status"], "shipped");
     assert_eq!(
-        refresh["liveProps"].as_object().unwrap().keys().collect::<Vec<_>>(),
+        refresh["liveProps"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .collect::<Vec<_>>(),
         ["order"]
     );
 }
@@ -664,8 +722,12 @@ fn live_props_emit_listeners_and_survive_exclusion() {
 fn unsupported_prop_combinations_are_rejected() {
     let request = request(&[]);
     let cases = vec![
-        Prop::lazy(|| 1).merge().live(LiveUpdates::on("E").channel("c")),
-        Prop::lazy(|| 1).scroll(ScrollProps::new("page", 1)).live(LiveUpdates::on("E").channel("c")),
+        Prop::lazy(|| 1)
+            .merge()
+            .live(LiveUpdates::on("E").channel("c")),
+        Prop::lazy(|| 1)
+            .scroll(ScrollProps::new("page", 1))
+            .live(LiveUpdates::on("E").channel("c")),
         Prop::lazy(|| 1).always().defer(),
         Prop::lazy(|| 1).always().once(),
         Prop::lazy(|| 1).rescue(),
@@ -676,7 +738,10 @@ fn unsupported_prop_combinations_are_rejected() {
         let error = Inertia::response("P", Props::new().prop("x", prop))
             .into_page("/", None, &request)
             .unwrap_err();
-        assert!(matches!(error, Error::InvalidProp { ref path, .. } if path == "x"), "{error}");
+        assert!(
+            matches!(error, Error::InvalidProp { ref path, .. } if path == "x"),
+            "{error}"
+        );
     }
 }
 
@@ -696,7 +761,9 @@ async fn async_props_resolve_only_when_needed() {
         )
     };
 
-    let page = render_async(response(), &partial("P", "cheap"), vec![]).await.unwrap();
+    let page = render_async(response(), &partial("P", "cheap"), vec![])
+        .await
+        .unwrap();
     assert_eq!(page["props"], json!({ "cheap": 1, "errors": {} }));
     assert_eq!(calls.load(Ordering::SeqCst), 0);
 
@@ -757,8 +824,7 @@ async fn concurrency_limit_bounds_in_flight_providers() {
     let request = request(&[]);
     let page = Inertia::response("P", props)
         .resolve(
-            RenderContext::new(&request, "/")
-                .options(ResolveOptions::new().concurrency_limit(2)),
+            RenderContext::new(&request, "/").options(ResolveOptions::new().concurrency_limit(2)),
         )
         .await
         .unwrap();
@@ -793,7 +859,10 @@ async fn rescued_deferred_props_are_omitted_and_reported() {
                     .defer()
                     .rescue(),
             )
-            .prop("roles", Prop::lazy_async(|| async { vec!["admin"] }).defer()),
+            .prop(
+                "roles",
+                Prop::lazy_async(|| async { vec!["admin"] }).defer(),
+            ),
     )
     .resolve(RenderContext::new(&request, "/users").options(options))
     .await
@@ -859,9 +928,7 @@ fn sync_rendering_rejects_needed_async_providers_only() {
     let response = || {
         Inertia::response(
             "P",
-            Props::new()
-                .value("a", 1)
-                .lazy_async("b", || async { 2 }),
+            Props::new().value("a", 1).lazy_async("b", || async { 2 }),
         )
     };
 
@@ -897,13 +964,18 @@ async fn shared_props_are_filtered_like_route_props_and_route_props_win() {
         vec![
             ("appName", Prop::json(json!("Demo"))),
             ("auth.user", Prop::json(json!({ "name": "Shared" }))),
-            ("notifications", Prop::lazy(counted(&shared_calls, json!([1])))),
+            (
+                "notifications",
+                Prop::lazy(counted(&shared_calls, json!([1]))),
+            ),
             ("title", Prop::json(json!("Shared title"))),
         ]
     };
     let response = || Inertia::response("P", json!({ "title": "Route title", "users": [] }));
 
-    let full = render_async(response(), &inertia(), shared()).await.unwrap();
+    let full = render_async(response(), &inertia(), shared())
+        .await
+        .unwrap();
     assert_eq!(
         full["props"],
         json!({
@@ -920,7 +992,9 @@ async fn shared_props_are_filtered_like_route_props_and_route_props_win() {
         json!(["appName", "auth", "notifications", "title"])
     );
 
-    let reload = render_async(response(), &partial("P", "users"), shared()).await.unwrap();
+    let reload = render_async(response(), &partial("P", "users"), shared())
+        .await
+        .unwrap();
     assert_eq!(reload["props"], json!({ "users": [], "errors": {} }));
     assert_eq!(shared_calls.load(Ordering::SeqCst), 1);
 }
@@ -931,7 +1005,10 @@ async fn shared_dotted_props_and_route_roots() {
     let page = render_async(
         Inertia::response("P", json!({ "auth": { "user": "Route" } })),
         &[],
-        vec![("auth.user", Prop::json(json!("Shared"))), ("auth.csrf", Prop::json(json!("t")))],
+        vec![
+            ("auth.user", Prop::json(json!("Shared"))),
+            ("auth.csrf", Prop::json(json!("t"))),
+        ],
     )
     .await
     .unwrap();
@@ -959,7 +1036,10 @@ async fn shared_once_props_respect_the_except_once_header() {
     let page = render_async(
         Inertia::response("P", ()),
         &headers,
-        vec![("countries", Prop::lazy(counted(&calls, json!(["NL"]))).once())],
+        vec![(
+            "countries",
+            Prop::lazy(counted(&calls, json!(["NL"]))).once(),
+        )],
     )
     .await
     .unwrap();
@@ -980,9 +1060,15 @@ fn big_integers_are_wrapped_in_props_and_flash() {
         .unwrap();
     let page = serde_json::to_value(page).unwrap();
 
-    assert_eq!(page["props"]["id"], json!({ "$bigint": "900719925474099988" }));
+    assert_eq!(
+        page["props"]["id"],
+        json!({ "$bigint": "900719925474099988" })
+    );
     assert_eq!(page["props"]["small"], 1);
-    assert_eq!(page["flash"]["created"], json!({ "$bigint": "900719925474099989" }));
+    assert_eq!(
+        page["flash"]["created"],
+        json!({ "$bigint": "900719925474099989" })
+    );
     assert_eq!(page["preserveBigIntegers"], true);
 }
 
@@ -1026,7 +1112,10 @@ fn layer_metadata_and_close_pages() {
         .into_page("/users/create", Some("v".into()), &request)
         .unwrap();
     let page = serde_json::to_value(page).unwrap();
-    assert_eq!(page["layer"], json!({ "key": "users-create", "base": "/users" }));
+    assert_eq!(
+        page["layer"],
+        json!({ "key": "users-create", "base": "/users" })
+    );
 
     let bare = Inertia::response("Users/Create", ())
         .layer(None, None)

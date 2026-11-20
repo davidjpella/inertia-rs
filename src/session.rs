@@ -370,7 +370,9 @@ mod tests {
 
     #[test]
     fn error_bag_rules_match_reference_adapter() {
-        let errors = ValidationErrors::new().add("name", "Required").add("name", "Too short");
+        let errors = ValidationErrors::new()
+            .add("name", "Required")
+            .add("name", "Too short");
         assert_eq!(errors.to_prop(None, false), json!({ "name": "Required" }));
         assert_eq!(
             errors.to_prop(Some("createUser"), false),
@@ -382,7 +384,10 @@ mod tests {
         );
 
         let named = ValidationErrors::new().add_to_bag("login", "email", "Invalid");
-        assert_eq!(named.to_prop(None, false), json!({ "login": { "email": "Invalid" } }));
+        assert_eq!(
+            named.to_prop(None, false),
+            json!({ "login": { "email": "Invalid" } })
+        );
         assert_eq!(
             named.to_prop(Some("other"), false),
             json!({ "login": { "email": "Invalid" } })
@@ -415,14 +420,20 @@ mod tests {
         // A page render consumes it exactly once.
         let mut render = SessionState::new(Some(stored));
         assert_eq!(render.consume(), data_with_flash());
-        assert_eq!(render.finish(ResponseKind::Other, true), SessionWrite::Clear);
+        assert_eq!(
+            render.finish(ResponseKind::Other, true),
+            SessionWrite::Clear
+        );
     }
 
     #[test]
     fn pending_data_without_redirect_is_not_stored() {
         let mut state = SessionState::new(None);
         state.flash("message", "Lost").unwrap();
-        assert_eq!(state.finish(ResponseKind::Other, false), SessionWrite::Unchanged);
+        assert_eq!(
+            state.finish(ResponseKind::Other, false),
+            SessionWrite::Unchanged
+        );
     }
 
     #[test]

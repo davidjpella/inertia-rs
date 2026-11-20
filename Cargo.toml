@@ -44,7 +44,7 @@ experimental-layers = []
 [dev-dependencies]
 futures-executor = "0.3.31"
 tower-sessions = { version = "0.15", features = ["memory-store", "axum-core"] }
-tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "time", "sync"] }
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "time", "sync", "net", "io-util"] }
 
 [package.metadata.docs.rs]
 all-features = true

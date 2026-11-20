@@ -23,8 +23,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 /// Boxed error returned by fallible prop providers.
 pub type BoxError = Box<dyn StdError + Send + Sync + 'static>;
 
-pub(crate) type SyncProvider<'a> =
-    Box<dyn FnOnce() -> Result<Option<Value>, BoxError> + Send + 'a>;
+pub(crate) type SyncProvider<'a> = Box<dyn FnOnce() -> Result<Option<Value>, BoxError> + Send + 'a>;
 pub(crate) type AsyncProvider<'a> =
     Box<dyn FnOnce() -> BoxFuture<'a, Result<Option<Value>, BoxError>> + Send + 'a>;
 pub(crate) type ScrollMetadataFn = Arc<dyn Fn(&Value) -> ScrollProps + Send + Sync>;
@@ -295,6 +294,13 @@ impl<'a> Prop<'a> {
         })))
     }
 
+    /// Creates a prop from an already computed outcome. `Ok(None)` omits the
+    /// key; `Err` fails the response.
+    #[cfg_attr(not(feature = "rocket"), allow(dead_code))]
+    pub(crate) fn computed(outcome: Result<Option<Value>, BoxError>) -> Self {
+        Self::from_source(Source::Sync(Box::new(move || outcome)))
+    }
+
     /// Always includes the prop, even when a partial reload's `only` or
     /// `except` lists would leave it out.
     pub fn always(mut self) -> Self {
@@ -500,8 +506,10 @@ impl<'a> Prop<'a> {
     }
 
     pub(crate) fn is_plain(&self) -> bool {
-        matches!(self.source, Source::Value(_) | Source::Plain(_) | Source::Nested(_))
-            && !self.always
+        matches!(
+            self.source,
+            Source::Value(_) | Source::Plain(_) | Source::Nested(_)
+        ) && !self.always
             && self.load == Load::Eager
             && self.once.is_none()
             && self.merge.is_none()
@@ -526,8 +534,11 @@ impl<'a> Prop<'a> {
             return Err("an always prop cannot be optional or deferred");
         }
 
-        if self.always && (self.once.is_some() || merges) {
-            return Err("an always prop cannot be a once, merge, or scroll prop");
+        // `always` and `once` contradict each other; `always` and merge
+        // metadata compose (the reference adapter cannot express it only
+        // because of its class hierarchy).
+        if self.always && (self.once.is_some() || self.scroll.is_some()) {
+            return Err("an always prop cannot be a once or scroll prop");
         }
 
         if self.rescue && !self.is_deferred() {
@@ -547,7 +558,9 @@ impl<'a> Prop<'a> {
         }
 
         if matches!(self.source, Source::Nested(_)) && !self.is_plain() {
-            return Err("nested prop trees cannot carry prop behaviour; configure the nested props");
+            return Err(
+                "nested prop trees cannot carry prop behaviour; configure the nested props",
+            );
         }
 
         Ok(())
