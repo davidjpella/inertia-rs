@@ -30,6 +30,7 @@
 //! );
 //! ```
 
+pub mod live;
 mod session;
 
 #[cfg(feature = "tower-sessions")]
