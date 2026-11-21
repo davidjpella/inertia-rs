@@ -4,6 +4,8 @@ members = [
     "axum-minimal",
     "axum-react",
     "axum-svelte",
+    "axum-vue",
     "rocket-minimal",
-    "rocket-svelte"
+    "rocket-svelte",
+    "smoke-server"
 ]
