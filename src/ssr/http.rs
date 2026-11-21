@@ -114,7 +114,7 @@ impl HttpSsrGateway {
         )
     }
 
-    async fn post(&self, page: &Value) -> Result<SsrResponse, SsrError> {
+    async fn post(&self, page: &Value) -> Result<Option<SsrResponse>, SsrError> {
         let body = serde_json::to_vec(page).map_err(|error| {
             SsrError::new(
                 SsrErrorKind::InvalidResponse,
@@ -154,7 +154,9 @@ impl HttpSsrGateway {
             });
         }
 
-        serde_json::from_slice(&bytes).map_err(|error| {
+        // The Vite dev endpoint answers `null` while its module graph warms
+        // up; like the reference adapter, render on the client.
+        serde_json::from_slice::<Option<SsrResponse>>(&bytes).map_err(|error| {
             SsrError::new(
                 SsrErrorKind::InvalidResponse,
                 format!("invalid SSR response body: {error}"),
@@ -164,7 +166,10 @@ impl HttpSsrGateway {
 }
 
 impl SsrGateway for HttpSsrGateway {
-    fn render<'a>(&'a self, page: &'a Value) -> BoxFuture<'a, Result<SsrResponse, SsrError>> {
+    fn render<'a>(
+        &'a self,
+        page: &'a Value,
+    ) -> BoxFuture<'a, Result<Option<SsrResponse>, SsrError>> {
         Box::pin(self.post(page))
     }
 }
@@ -229,6 +234,7 @@ mod tests {
         let response = gateway
             .render(&json!({ "component": "Event", "props": {}, "url": "/", "version": "" }))
             .await
+            .unwrap()
             .unwrap();
 
         assert_eq!(response.head(), ["<title>Event</title>"]);
@@ -254,6 +260,17 @@ mod tests {
             .await
             .unwrap()
             .starts_with("POST /__inertia_ssr HTTP/1.1"));
+    }
+
+    #[tokio::test]
+    async fn null_bodies_decline_without_error() {
+        let (url, _server) = serve_once("200 OK", "null", Duration::ZERO).await;
+        let response = HttpSsrGateway::vite_dev(&url)
+            .unwrap()
+            .render(&json!({}))
+            .await;
+
+        assert_eq!(response, Ok(None));
     }
 
     #[tokio::test]

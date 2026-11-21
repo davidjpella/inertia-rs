@@ -711,7 +711,10 @@ struct FakeSsr {
 }
 
 impl SsrGateway for FakeSsr {
-    fn render<'a>(&'a self, page: &'a Value) -> BoxFuture<'a, Result<SsrResponse, SsrError>> {
+    fn render<'a>(
+        &'a self,
+        page: &'a Value,
+    ) -> BoxFuture<'a, Result<Option<SsrResponse>, SsrError>> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         let fail = self.fail;
         let component = page["component"].as_str().unwrap_or_default().to_owned();
@@ -722,10 +725,10 @@ impl SsrGateway for FakeSsr {
                     "refused",
                 ))
             } else {
-                Ok(SsrResponse::new(
+                Ok(Some(SsrResponse::new(
                     vec![format!("<title>{component}</title>")],
                     format!(r#"<div data-server-rendered="true" id="app">{component}</div>"#),
-                ))
+                )))
             }
         })
     }

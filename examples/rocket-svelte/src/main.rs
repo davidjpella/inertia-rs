@@ -94,17 +94,13 @@ fn rocket() -> _ {
         rocket::Config::figment().merge(("template_dir", rocket::fs::relative!("templates")));
 
     rocket::custom(figment)
-        .manage(
-            SharedProps::new()
-                .value("appName", "Rocket Svelte")
-                .value(
-                    "auth.user",
-                    serde_json::json!({
-                        "name": "Ada Lovelace",
-                        "role": "Example user",
-                    }),
-                ),
-        )
+        .manage(SharedProps::new().value("appName", "Rocket Svelte").value(
+            "auth.user",
+            serde_json::json!({
+                "name": "Ada Lovelace",
+                "role": "Example user",
+            }),
+        ))
         .mount("/", routes![hello])
         .attach(Template::fairing())
         .mount("/public", FileServer::from(rocket::fs::relative!("public")))

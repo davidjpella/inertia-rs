@@ -26,9 +26,11 @@ fn rocket() -> _ {
     rocket::build()
         .mount("/", routes![hello])
         .manage(SharedProps::new().value("appName", "Rocket Minimal"))
-        .attach(VersionFairing::new("asset-version-1", |request, context| {
-            RawHtml(format!(
-                r#"<!doctype html>
+        .attach(VersionFairing::new(
+            "asset-version-1",
+            |request, context| {
+                RawHtml(format!(
+                    r#"<!doctype html>
 <html>
   <head>
     <meta charset="utf-8" />
@@ -39,8 +41,9 @@ fn rocket() -> _ {
     <main id="app">Open this route with an Inertia request to receive JSON.</main>
   </body>
 </html>"#,
-                context.data_page()
-            ))
-            .respond_to(request)
-        }))
+                    context.data_page()
+                ))
+                .respond_to(request)
+            },
+        ))
 }

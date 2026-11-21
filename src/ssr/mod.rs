@@ -152,7 +152,14 @@ impl std::error::Error for SsrError {}
 /// or the Vite dev server. Implement this trait to use another transport.
 pub trait SsrGateway: Send + Sync {
     /// Renders `page`, the full page object.
-    fn render<'a>(&'a self, page: &'a Value) -> BoxFuture<'a, Result<SsrResponse, SsrError>>;
+    ///
+    /// Returns `Ok(None)` when the server declines to render without an
+    /// error, as the Vite dev endpoint does (`null`) while it warms up. The
+    /// page is then rendered on the client without reporting a failure.
+    fn render<'a>(
+        &'a self,
+        page: &'a Value,
+    ) -> BoxFuture<'a, Result<Option<SsrResponse>, SsrError>>;
 }
 
 /// What to do when SSR fails.
@@ -239,7 +246,7 @@ impl Ssr {
     /// client rendering.
     pub async fn render(&self, page: &Value) -> Result<Option<SsrResponse>, SsrError> {
         match self.gateway.render(page).await {
-            Ok(response) => Ok(Some(response)),
+            Ok(response) => Ok(response),
             Err(error) => {
                 match &self.reporter {
                     Some(reporter) => reporter(&error, page),
@@ -270,7 +277,10 @@ mod tests {
     struct Failing;
 
     impl SsrGateway for Failing {
-        fn render<'a>(&'a self, _page: &'a Value) -> BoxFuture<'a, Result<SsrResponse, SsrError>> {
+        fn render<'a>(
+            &'a self,
+            _page: &'a Value,
+        ) -> BoxFuture<'a, Result<Option<SsrResponse>, SsrError>> {
             Box::pin(async {
                 Err(SsrError::from_body(&json!({
                     "error": "window is not defined",

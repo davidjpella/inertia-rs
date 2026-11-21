@@ -657,13 +657,16 @@ fn inertia_headers_guard_reads_headers() {
 struct EchoSsr;
 
 impl SsrGateway for EchoSsr {
-    fn render<'a>(&'a self, page: &'a Value) -> BoxFuture<'a, Result<SsrResponse, SsrError>> {
+    fn render<'a>(
+        &'a self,
+        page: &'a Value,
+    ) -> BoxFuture<'a, Result<Option<SsrResponse>, SsrError>> {
         let component = page["component"].as_str().unwrap_or_default().to_owned();
         Box::pin(async move {
-            Ok(SsrResponse::new(
+            Ok(Some(SsrResponse::new(
                 vec![format!("<title>{component}</title>")],
                 format!(r#"<div data-server-rendered="true" id="app">{component}</div>"#),
-            ))
+            )))
         })
     }
 }
