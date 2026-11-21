@@ -3,6 +3,7 @@
 import { expect, test } from '@playwright/test'
 import {
   collectErrors,
+  gotoHydrated,
   expectNewDocument,
   expectSameDocument,
   markWindow,
@@ -17,7 +18,7 @@ test.describe('first visit and SSR', () => {
     expect(html).toContain('<script data-page="app" type="application/json">')
 
     const errors = collectErrors(page)
-    await page.goto('/')
+    await gotoHydrated(page, '/')
     await expect(page.getByTestId('greeting')).toHaveText('Hello from Axum')
     await expect(page).toHaveTitle('Dashboard · Inertia Rust')
     // Hydration attaches handlers: an Inertia visit works without a reload.
@@ -29,7 +30,7 @@ test.describe('first visit and SSR', () => {
   })
 
   test('shared props are available on every page', async ({ page }) => {
-    await page.goto('/users')
+    await gotoHydrated(page, '/users')
     await expect(page.getByTestId('app-name')).toHaveText('Inertia Rust')
     await expect(page.getByTestId('current-user')).toHaveText('Ada Lovelace')
   })
@@ -37,7 +38,7 @@ test.describe('first visit and SSR', () => {
 
 test.describe('navigation', () => {
   test('links swap components without a full reload and back works', async ({ page }) => {
-    await page.goto('/')
+    await gotoHydrated(page, '/')
     await markWindow(page)
 
     const json = nextInertiaResponse(page, '/users')
@@ -54,7 +55,7 @@ test.describe('navigation', () => {
   })
 
   test('fragment redirects become Inertia visits that keep the fragment', async ({ page }) => {
-    await page.goto('/')
+    await gotoHydrated(page, '/')
     await markWindow(page)
     await page.getByTestId('fragment-link').click()
     await expect(page).toHaveURL(/\/users#bottom$/)
@@ -66,14 +67,14 @@ test.describe('navigation', () => {
     await page.route('https://inertiajs.com/**', (route) =>
       route.fulfill({ contentType: 'text/html', body: '<h1>External</h1>' }),
     )
-    await page.goto('/')
+    await gotoHydrated(page, '/')
     await page.getByTestId('external-link').click()
     await expect(page).toHaveURL('https://inertiajs.com/')
     await expect(page.getByRole('heading', { name: 'External' })).toBeVisible()
   })
 
   test('unknown routes render the Inertia error page with a 404', async ({ page }) => {
-    const response = await page.goto('/does-not-exist')
+    const response = await gotoHydrated(page, '/does-not-exist')
     expect(response.status()).toBe(404)
     await expect(page.getByTestId('error-status')).toHaveText('404')
   })
@@ -87,7 +88,7 @@ test.describe('props', () => {
       if (only) groups.push(only)
     })
 
-    await page.goto('/')
+    await gotoHydrated(page, '/')
     await expect(page.getByTestId('stats')).toHaveText('1234 visits, 3.2% conversion')
     await expect(page.getByTestId('report')).toHaveText('Report loaded')
     expect(groups.sort()).toEqual(['report', 'stats'])
@@ -97,7 +98,7 @@ test.describe('props', () => {
     const reload = nextInertiaResponse(page, '/', (response) =>
       (response.request().headers()['x-inertia-partial-data'] ?? '').includes('report'),
     )
-    await page.goto('/?fail=1')
+    await gotoHydrated(page, '/?fail=1')
     const response = await reload
     expect(response.status()).toBe(200)
     expect((await response.json()).rescuedProps).toEqual(['report'])
@@ -106,7 +107,7 @@ test.describe('props', () => {
   })
 
   test('optional props load only when requested', async ({ page }) => {
-    await page.goto('/')
+    await gotoHydrated(page, '/')
     await expect(page.getByTestId('audit')).toHaveCount(0)
 
     const reload = nextInertiaResponse(page, '/')
@@ -118,7 +119,7 @@ test.describe('props', () => {
   })
 
   test('shared once props are remembered across visits', async ({ page }) => {
-    await page.goto('/')
+    await gotoHydrated(page, '/')
     await expect(page.getByTestId('countries')).toContainText('Japan')
     await page.getByRole('link', { name: 'Users', exact: true }).click()
     await expect(page).toHaveURL(/\/users$/)
@@ -134,14 +135,14 @@ test.describe('props', () => {
   })
 
   test('big integers survive as BigInt values', async ({ page }) => {
-    await page.goto('/')
+    await gotoHydrated(page, '/')
     await expect(page.getByTestId('big-id')).toHaveText('bigint:900719925474099988')
   })
 })
 
 test.describe('forms, validation, and flash', () => {
   test('validation errors redirect back and are shown once', async ({ page }) => {
-    await page.goto('/users/create')
+    await gotoHydrated(page, '/users/create')
     await markWindow(page)
 
     const post = page.waitForResponse((response) => response.request().method() === 'POST')
@@ -157,7 +158,7 @@ test.describe('forms, validation, and flash', () => {
   })
 
   test('successful submissions flash once and survive the redirect', async ({ page }) => {
-    await page.goto('/users/create')
+    await gotoHydrated(page, '/users/create')
     await page.getByLabel('Name').fill('Grace Hopper')
     await page.getByLabel('Email').fill('grace@example.com')
     await page.getByTestId('submit').click()
@@ -178,19 +179,25 @@ test.describe('forms, validation, and flash', () => {
   })
 
   test('delete redirects with 303 and flashes', async ({ page }) => {
-    await page.goto('/users/2')
-    await expect(page.getByTestId('activity')).toContainText('User 2 signed in')
+    await gotoHydrated(page, '/users')
+    const link = page.getByTestId('user-row').last().getByRole('link')
+    const name = await link.textContent()
+    await link.click()
+    await expect(page.getByTestId('user-name')).toHaveText(name)
+    const id = new URL(page.url()).pathname.split('/').pop()
+    await expect(page.getByTestId('activity')).toContainText(`User ${id} signed in`)
+
     const destroy = page.waitForResponse((response) => response.request().method() === 'DELETE')
     await page.getByTestId('delete').click()
     expect((await destroy).status()).toBe(303)
     await expect(page).toHaveURL(/\/users$/)
-    await expect(page.getByTestId('flash')).toHaveText('User 2 deleted.')
+    await expect(page.getByTestId('flash')).toHaveText(`User ${id} deleted.`)
   })
 })
 
 test.describe('infinite scroll', () => {
   test('loads further pages and merges them', async ({ page }) => {
-    await page.goto('/users')
+    await gotoHydrated(page, '/users')
     await expect(page.getByTestId('user-row')).toHaveCount(15)
 
     const next = nextInertiaResponse(page, '/users')
@@ -207,10 +214,15 @@ test.describe('infinite scroll', () => {
 
 test.describe('asset versioning', () => {
   test('a version change forces a full reload on the next visit', async ({ page, request }) => {
-    await page.goto('/')
+    await gotoHydrated(page, '/')
+    // Let the deferred-prop reloads finish so they cannot receive the 409.
+    await expect(page.getByTestId('stats')).toBeVisible()
+    await expect(page.getByTestId('report')).toBeVisible()
     await markWindow(page)
 
-    const conflict = page.waitForResponse((response) => response.status() === 409)
+    const conflict = page.waitForResponse(
+      (response) => response.status() === 409 && new URL(response.url()).pathname === '/users',
+    )
     expect((await request.post('/__e2e/bump-version')).status()).toBe(204)
     await page.getByRole('link', { name: 'Users', exact: true }).click()
     const response = await conflict
@@ -226,8 +238,8 @@ test.describe('live props', () => {
   test('broadcast values update other clients without a request', async ({ browser }) => {
     const watcher = await browser.newPage()
     const actor = await browser.newPage()
-    await watcher.goto('/')
-    await actor.goto('/')
+    await gotoHydrated(watcher, '/')
+    await gotoHydrated(actor, '/')
     const before = Number(await watcher.getByTestId('orders-count').textContent())
 
     const reloads = []
@@ -248,8 +260,8 @@ test.describe('live props', () => {
   }) => {
     const watcher = await browser.newPage()
     const actor = await browser.newPage()
-    await watcher.goto('/')
-    await actor.goto('/')
+    await gotoHydrated(watcher, '/')
+    await gotoHydrated(actor, '/')
     const initial = await watcher.getByTestId('last-order-at').textContent()
 
     let actorReloads = 0

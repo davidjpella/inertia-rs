@@ -36,3 +36,16 @@ export function nextInertiaResponse(page, path, predicate = () => true) {
       predicate(response),
   )
 }
+
+/**
+ * Loads `url` and waits until React has hydrated the server-rendered page,
+ * so interactions reach React's event handlers instead of the static markup.
+ */
+export async function gotoHydrated(page, url) {
+  const response = await page.goto(url)
+  await page.waitForFunction(() => {
+    const root = document.getElementById('app')
+    return Boolean(root && root.querySelector('*') && Object.keys(root.firstElementChild ?? {}).some((key) => key.startsWith('__react')))
+  })
+  return response
+}
