@@ -1,0 +1,21 @@
+[package]
+name = "axum-react"
+version = "0.1.0"
+edition = "2021"
+workspace = "../"
+publish = false
+
+[features]
+# Unreleased Layers protocol (inertiajs/inertia#3236). Requires the client
+# built from the pinned PR commit; see README.md.
+layers = ["inertia_rs/experimental-layers"]
+
+[dependencies]
+axum = "0.8.9"
+inertia_rs = { path = "../..", default-features = false, features = ["axum", "tower-sessions", "ssr"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "time", "sync"] }
+tower-http = { version = "0.6.10", features = ["fs"] }
+tower-sessions = { version = "0.15", features = ["memory-store"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

@@ -12,44 +12,97 @@ jobs:
         with:
           components: clippy, rustfmt
       - run: cargo fmt --all -- --check
+      - run: cargo fmt --all --manifest-path examples/Cargo.toml -- --check
       - run: cargo clippy --all-features --all-targets -- -D warnings
       - run: cargo test --all-features
+      - run: cargo test --no-default-features --features axum --lib
+      - run: cargo test --no-default-features --features rocket --lib
       - run: cargo check --no-default-features
       - run: cargo check --no-default-features --features rocket
       - run: cargo check --no-default-features --features axum
+      - run: cargo check --no-default-features --features axum,tower-sessions
+      - run: cargo check --no-default-features --features ssr
+      - run: cargo check --no-default-features --features experimental-layers
       - run: RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps
       - run: RUSTDOCFLAGS="-D warnings" cargo doc --no-default-features --no-deps
 
   msrv:
-    name: MSRV
+    name: MSRV (1.88)
     runs-on: ubuntu-latest
+    env:
+      # Resolve dependency versions that support the MSRV (for example
+      # Rocket 0.5.4 requires Rust 1.89; 0.5.1 supports 1.88).
+      CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS: fallback
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.88.0
+      - run: cargo generate-lockfile
       - run: cargo check --all-features
       - run: cargo check --no-default-features
       - run: cargo check --no-default-features --features rocket
       - run: cargo check --no-default-features --features axum
+      - run: cargo test --all-features --lib
 
-  example:
-    name: Example
+  e2e:
+    name: Examples and browser tests (Inertia 3.11.0)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: |
-            examples/rocket-svelte/svelte-app/package-lock.json
-            examples/axum-svelte/svelte-app/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
-      - run: npm ci
-        working-directory: examples/rocket-svelte/svelte-app
-      - run: npm run build
-        working-directory: examples/rocket-svelte/svelte-app
-      - run: npm ci
-        working-directory: examples/axum-svelte/svelte-app
-      - run: npm run build
-        working-directory: examples/axum-svelte/svelte-app
-      - run: cargo test --manifest-path examples/Cargo.toml
+      - name: Build frontends
+        run: |
+          for dir in examples/axum-react/frontend examples/axum-vue/vue-app \
+                     examples/axum-svelte/svelte-app examples/rocket-svelte/svelte-app; do
+            (cd "$dir" && npm ci && npm run build)
+          done
+      - name: Build and test examples
+        working-directory: examples
+        run: |
+          cargo build --workspace
+          cargo test --workspace
+        env:
+          CARGO_TARGET_DIR: ../target
+      - name: Install Playwright
+        working-directory: e2e
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: Run browser tests
+        working-directory: e2e
+        run: npx playwright test
+        env:
+          CI: '1'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+
+  e2e-layers:
+    name: Experimental Layers (inertiajs/inertia#3236)
+    runs-on: ubuntu-latest
+    # The upstream contract is unreleased and may change; failures here do
+    # not block stable compatibility.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+      - run: scripts/build-layers-client.sh
+      - name: Build layers frontend
+        working-directory: examples/axum-react/frontend-layers
+        run: npm install && npm run build
+      - name: Build example
+        working-directory: examples
+        run: cargo build -p axum-react --features layers
+        env:
+          CARGO_TARGET_DIR: ../target
+      - name: Run layers browser tests
+        working-directory: e2e
+        run: npm ci && npx playwright install --with-deps chromium && npx playwright test
+        env:
+          CI: '1'
+          E2E_FRAMEWORKS: layers

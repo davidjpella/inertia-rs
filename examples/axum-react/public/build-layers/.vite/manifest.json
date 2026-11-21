@@ -1,0 +1,83 @@
+{
+  "src/Pages/ConfirmPassword.jsx": {
+    "file": "assets/ConfirmPassword-BaXr1VZF.js",
+    "name": "ConfirmPassword",
+    "src": "src/Pages/ConfirmPassword.jsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "src/app.jsx"
+    ]
+  },
+  "src/Pages/Dashboard.jsx": {
+    "file": "assets/Dashboard-CMjGUsF5.js",
+    "name": "Dashboard",
+    "src": "src/Pages/Dashboard.jsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "src/app.jsx"
+    ]
+  },
+  "src/Pages/Error.jsx": {
+    "file": "assets/Error-BoHYKt6b.js",
+    "name": "Error",
+    "src": "src/Pages/Error.jsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "src/app.jsx"
+    ]
+  },
+  "src/Pages/Users/Create.jsx": {
+    "file": "assets/Create-kWbmkc3F.js",
+    "name": "Create",
+    "src": "src/Pages/Users/Create.jsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "src/app.jsx"
+    ]
+  },
+  "src/Pages/Users/Edit.jsx": {
+    "file": "assets/Edit-COvWcQVK.js",
+    "name": "Edit",
+    "src": "src/Pages/Users/Edit.jsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "src/app.jsx"
+    ]
+  },
+  "src/Pages/Users/Index.jsx": {
+    "file": "assets/Index-BBzDLCO7.js",
+    "name": "Index",
+    "src": "src/Pages/Users/Index.jsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "src/app.jsx"
+    ]
+  },
+  "src/Pages/Users/Show.jsx": {
+    "file": "assets/Show-DKibqKHd.js",
+    "name": "Show",
+    "src": "src/Pages/Users/Show.jsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "src/app.jsx"
+    ]
+  },
+  "src/app.jsx": {
+    "file": "assets/app-DYvcRlyr.js",
+    "name": "app",
+    "src": "src/app.jsx",
+    "isEntry": true,
+    "dynamicImports": [
+      "src/Pages/ConfirmPassword.jsx",
+      "src/Pages/Dashboard.jsx",
+      "src/Pages/Error.jsx",
+      "src/Pages/Users/Create.jsx",
+      "src/Pages/Users/Edit.jsx",
+      "src/Pages/Users/Index.jsx",
+      "src/Pages/Users/Show.jsx"
+    ],
+    "css": [
+      "assets/app-B2ZNv5wc.css"
+    ]
+  }
+}
