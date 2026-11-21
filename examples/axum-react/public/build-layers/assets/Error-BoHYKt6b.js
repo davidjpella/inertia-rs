@@ -1,0 +1,1 @@
+import{a as e,r as t,t as n}from"./app-DYvcRlyr.js";var r=n();function i({status:n}){return(0,r.jsxs)(r.Fragment,{children:[(0,r.jsx)(t,{title:`Error ${n}`}),(0,r.jsx)(`h1`,{"data-testid":`error-status`,children:n}),(0,r.jsx)(e,{href:`/`,children:`Back to the dashboard`})]})}export{i as default};

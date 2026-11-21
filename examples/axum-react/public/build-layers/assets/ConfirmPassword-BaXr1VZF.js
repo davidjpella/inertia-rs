@@ -1,0 +1,1 @@
+import{l as e,r as t,t as n}from"./app-DYvcRlyr.js";var r=n();function i(){return(0,r.jsxs)(r.Fragment,{children:[(0,r.jsx)(t,{title:`Confirm password`}),(0,r.jsx)(`h1`,{"data-testid":`confirm-heading`,children:`Confirm your password`}),(0,r.jsx)(`button`,{type:`button`,"data-testid":`confirm`,onClick:()=>e.post(`/confirm-password`),children:`Confirm`})]})}export{i as default};

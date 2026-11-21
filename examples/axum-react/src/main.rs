@@ -93,6 +93,13 @@ fn example_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
+/// Directory holding the client build, relative to the example. The layers
+/// build (experimental) uses `public/build-layers`.
+fn build_dir() -> PathBuf {
+    example_dir()
+        .join(std::env::var("FRONTEND_BUILD_DIR").unwrap_or_else(|_| "public/build".into()))
+}
+
 fn load_assets() -> Assets {
     if let Ok(origin) = std::env::var("VITE_DEV_SERVER") {
         return Assets::Dev {
@@ -100,7 +107,7 @@ fn load_assets() -> Assets {
         };
     }
 
-    let manifest_path = example_dir().join("public/build/.vite/manifest.json");
+    let manifest_path = build_dir().join(".vite/manifest.json");
     let manifest = std::fs::read_to_string(&manifest_path).unwrap_or_else(|_| {
         panic!(
             "missing {}; run `npm install && npm run build` in examples/axum-react/frontend, \
@@ -416,6 +423,125 @@ async fn users_destroy(
     request.redirect(Inertia::redirect("/users"))
 }
 
+/// Experimental Layers routes (inertiajs/inertia#3236).
+///
+/// On a client built from the pinned PR commit, `/users/{id}/edit` opens as
+/// a layer over the user page; on stable 3.11 it renders as an ordinary page.
+#[cfg(feature = "layers")]
+mod layers {
+    use super::*;
+    use tower_sessions::Session;
+
+    const CONFIRMED: &str = "example.password_confirmed";
+    const INTENDED: &str = "example.intended";
+
+    pub(super) fn routes(router: Router<AppState>) -> Router<AppState> {
+        router
+            .route("/users/{id}/edit", get(edit).put(update))
+            .route("/users/{id}/secure-edit", get(secure_edit))
+            .route("/confirm-password", get(confirm_form).post(confirm))
+    }
+
+    fn find(state: &AppState, id: u64) -> Option<User> {
+        state
+            .users
+            .read()
+            .expect("users lock")
+            .iter()
+            .find(|user| user.id == id)
+            .cloned()
+    }
+
+    async fn render_edit(request: InertiaRequest, user: User) -> Result<Response, InertiaError> {
+        let base = format!("/users/{}", user.id);
+        request
+            .respond(
+                Inertia::response("Users/Edit", json!({ "user": user })).layer(Some(base), None),
+            )
+            .await
+    }
+
+    async fn edit(
+        State(state): State<AppState>,
+        request: InertiaRequest,
+        Path(id): Path<u64>,
+    ) -> Result<Response, InertiaError> {
+        match find(&state, id) {
+            Some(user) => render_edit(request, user).await,
+            None => not_found(request).await,
+        }
+    }
+
+    async fn update(
+        State(state): State<AppState>,
+        request: InertiaRequest,
+        Path(id): Path<u64>,
+        Json(form): Json<UserForm>,
+    ) -> Result<Response, InertiaError> {
+        if form.name.trim().is_empty() {
+            request.with_errors(ValidationErrors::new().add("name", "The name field is required."));
+            return request.back_or(&format!("/users/{id}/edit"));
+        }
+
+        if let Some(user) = state
+            .users
+            .write()
+            .expect("users lock")
+            .iter_mut()
+            .find(|user| user.id == id)
+        {
+            user.name = form.name.trim().to_owned();
+        }
+
+        request.flash("message", "User updated.")?;
+        request.close()
+    }
+
+    /// Requires a password confirmation first. The redirect is marked as an
+    /// interstitial so the client keeps the pending layer through the detour.
+    async fn secure_edit(
+        State(state): State<AppState>,
+        session: Session,
+        request: InertiaRequest,
+        Path(id): Path<u64>,
+    ) -> Result<Response, InertiaError> {
+        let confirmed = session
+            .get::<bool>(CONFIRMED)
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or(false);
+
+        if !confirmed {
+            let _ = session.insert(INTENDED, request.uri().to_owned()).await;
+            request.interstitial();
+            return request.redirect(Inertia::redirect("/confirm-password"));
+        }
+
+        match find(&state, id) {
+            Some(user) => render_edit(request, user).await,
+            None => not_found(request).await,
+        }
+    }
+
+    async fn confirm_form(request: InertiaRequest) -> Result<Response, InertiaError> {
+        request
+            .respond(Inertia::response("ConfirmPassword", ()))
+            .await
+    }
+
+    async fn confirm(session: Session, request: InertiaRequest) -> Result<Response, InertiaError> {
+        let _ = session.insert(CONFIRMED, true).await;
+        let intended = session
+            .remove::<String>(INTENDED)
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or_else(|| "/".to_owned());
+        request.redirect(Inertia::redirect(intended))
+    }
+}
+
 async fn external(request: InertiaRequest) -> Result<Response, InertiaError> {
     request.location(Inertia::location("https://inertiajs.com/"))
 }
@@ -499,6 +625,11 @@ fn app(state: AppState) -> Router {
         .route("/external", get(external))
         .route("/fragment", get(fragment));
 
+    #[cfg(feature = "layers")]
+    {
+        router = layers::routes(router);
+    }
+
     if std::env::var("INERTIA_E2E").is_ok() {
         router = router.route("/__e2e/bump-version", post(bump_version));
     }
@@ -506,7 +637,7 @@ fn app(state: AppState) -> Router {
     router
         .fallback(not_found)
         .with_state(state)
-        .nest_service("/build", ServeDir::new(example_dir().join("public/build")))
+        .nest_service("/build", ServeDir::new(build_dir()))
         .layer(layer)
         .layer(SessionManagerLayer::new(MemoryStore::default()).with_secure(false))
 }
