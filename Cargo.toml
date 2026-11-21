@@ -1,13 +1,13 @@
 [package]
 name = "inertia_rs"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 rust-version = "1.88"
 license = "MIT"
 homepage = "https://github.com/stuarth/inertia-rs"
 repository = "https://github.com/stuarth/inertia-rs"
 description = "Inertia.js server adapter for Rust (Axum and Rocket)"
-keywords = ["inertia", "web", "framework", "rocket", "axum"]
+keywords = ["inertia", "web", "ssr", "rocket", "axum"]
 categories = ["web-programming"]
 readme = "README.md"
 

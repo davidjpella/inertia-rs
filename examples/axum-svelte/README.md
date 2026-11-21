@@ -1,37 +1,12 @@
-# Axum Svelte
+# Axum + Svelte 5
 
-Small Axum + Svelte 5 + Inertia example.
-
-The page demonstrates shared props, deferred props, optional props, and partial
-reloads from the Svelte client.
-
-## Build Frontend Assets
-
-From the repository root:
+Svelte 5 example on `@inertiajs/svelte` 3.11.0, served by the shared
+[`smoke-server`](../smoke-server) routes plus a `/hello` page.
 
 ```sh
-cd examples/axum-svelte/svelte-app
-npm install
-npm run build
-cd ../../..
+cd examples/axum-svelte/svelte-app && npm install && npm run build
+cd ../.. && cargo run -p axum-svelte     # http://127.0.0.1:3002/ and /hello
 ```
 
-## Start The Server
-
-```sh
-cargo run --manifest-path examples/Cargo.toml -p axum-svelte
-```
-
-Then open http://127.0.0.1:3002/hello.
-
-An Inertia JSON request with the matching asset version returns the page object:
-
-```sh
-VERSION=$(jq -r '."src/main.js" | ([.file] + (.css // [])) | join("|")' \
-  examples/axum-svelte/public/build/.vite/manifest.json)
-
-curl -H 'X-Inertia: true' -H "X-Inertia-Version: ${VERSION}" \
-  http://127.0.0.1:3002/hello
-```
-
-The version is derived from the built script and stylesheet asset names.
+Routes: `/` (deferred and optional props), `/smoke/form` (validation errors and
+flash), `/hello` (shared, deferred, and optional props with partial reloads).
