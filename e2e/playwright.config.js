@@ -1,12 +1,13 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const examples = new URL('../examples/', import.meta.url).pathname
-const frameworks = (process.env.E2E_FRAMEWORKS ?? 'react,vue,svelte').split(',')
+const frameworks = (process.env.E2E_FRAMEWORKS ?? 'react,vue,svelte,rocket').split(',')
 
 const apps = {
   react: { port: 34100, example: 'axum-react', ssrPort: 13714 },
   vue: { port: 34101, example: 'axum-vue' },
   svelte: { port: 34102, example: 'axum-svelte' },
+  rocket: { port: 34104, example: 'rocket-svelte', home: '/hello', env: { ROCKET_PORT: '34104' } },
   // Experimental: requires scripts/build-layers-client.sh and a build of
   // examples/axum-react/frontend-layers. Not part of the default run.
   layers: {
@@ -35,7 +36,7 @@ const servers = frameworks.flatMap((framework) => {
   entries.push({
     command: `cargo run --quiet -p ${app.example} ${app.cargoArgs ?? ''}`,
     cwd: examples,
-    url: `http://127.0.0.1:${app.port}/`,
+    url: `http://127.0.0.1:${app.port}${app.home ?? '/'}`,
     timeout: 300_000,
     reuseExistingServer: !process.env.CI,
     env: {
@@ -59,7 +60,9 @@ export default defineConfig({
   use: { ...devices['Desktop Chrome'], trace: 'retain-on-failure' },
   projects: frameworks.map((framework) => ({
     name: framework,
-    testMatch: { react: /react\.spec\.js/, layers: /layers\.spec\.js/ }[framework] ?? /smoke\.spec\.js/,
+    testMatch:
+      { react: /react\.spec\.js/, layers: /layers\.spec\.js/, rocket: /rocket\.spec\.js/ }[framework] ??
+      /smoke\.spec\.js/,
     use: { baseURL: `http://127.0.0.1:${apps[framework].port}` },
   })),
   webServer: servers,
